@@ -79,30 +79,4 @@ This lecture builds upon the foundational concepts from the "Zero to Hero" serie
 
 ---
 
-## Usage Instructions
-
-### Requirements
-- Python 3.8+
-- PyTorch
-- NumPy
-- Matplotlib
-
-### Steps to Run the Code
-1. Clone this repository and navigate to the project directory.
-2. Install the required dependencies:
-   ```bash
-   pip install torch numpy matplotlib
-   ```
-3. Ensure the `cleaned_names.txt` dataset is in the correct directory.
-4. Run the script to train the model:
-   ```bash
-   python train_wavenet.py
-   ```
-5. Generate new names using the trained model:
-   ```bash
-   python generate_names.py
-   ```
-
----
-
 This lecture deepened my understanding of autoregressive sequence modeling and introduced the foundational concepts behind Wavenet. By combining practical implementation with theoretical insights from the research paper, I was able to bridge the gap between abstract architecture design and real-world application.
