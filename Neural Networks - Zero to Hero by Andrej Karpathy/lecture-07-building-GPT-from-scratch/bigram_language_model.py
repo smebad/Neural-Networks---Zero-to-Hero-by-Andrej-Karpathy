@@ -7,14 +7,14 @@ batch_size = 32 # number of samples in each batch
 block_size = 8 # length of each input
 max_iters = 3000 # number of training iterations
 eval_interval = 300 # interval to evaluate the model
-learning_rate = le-2 # learning rate for the optimizer
+learning_rate = 1e-2 # learning rate for the optimizer
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 eval_iters = 200 # number of iterations to evaluate the model
 
 torch.manual_seed(1337)
 
 # Reading the data from the file
-with open('input.txt', 'r', encoding='utf-8') as f:
+with open(r"C:\Users\DC\Desktop\Neural Networks - Zero to Hero by Andrej Karpathy\Neural Networks - Zero to Hero by Andrej Karpathy\lecture-07-building-GPT-from-scratch\input.txt", 'r', encoding='utf-8') as f:
     text = f.read()
 
 # Unique characters that appear in the text
