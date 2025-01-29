@@ -66,11 +66,17 @@ class BigramLanguageModel(nn.Module):
     def __init__(self): # initialize the model
         super().__init__() # initialize the base class
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd) # embedding table
+        self.positional_embedding_table = nn.Embedding(block_size, n_embd) # embedding table
         self.lm_head = nn.Linear(n_embd, vocab_size) # linear layer to predict the next token
 
     def forward(self, idx, targets=None): # forward function for the model
+        B, T = idx.shape # B is the batch size, T is the sequence length
+
         tok_emb = self.token_embedding_table(idx) # token embeddings
-        logits = self.lm_head(tok_emb) # (B, T, C) - B is the batch size, T is the sequence length, C is the number of characters
+        pos_emb = self.positional_embedding_table(torch.arange(T, device=device)) # positional embeddings
+
+        x = tok_emb + pos_emb # add token and positional embeddings
+        logits = self.lm_head(x) # (B, T, C) - B is the batch size, T is the sequence length, C is the number of characters
 
         if targets is None:
             loss = None
