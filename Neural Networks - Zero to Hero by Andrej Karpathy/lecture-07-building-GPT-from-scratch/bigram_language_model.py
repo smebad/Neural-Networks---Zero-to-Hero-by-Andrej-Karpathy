@@ -10,6 +10,7 @@ eval_interval = 300 # interval to evaluate the model
 learning_rate = 1e-2 # learning rate for the optimizer
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 eval_iters = 200 # number of iterations to evaluate the model
+n_embd = 32 # dimensionality of the character embeddings
 
 torch.manual_seed(1337)
 
@@ -62,12 +63,14 @@ def estimate_loss():
 
 # Implementing the Transformer model using PyTorch (Bigram Language Model)
 class BigramLanguageModel(nn.Module):
-    def __init__(self, vocab_size):
-        super().__init__()
-        self.token_embedding_table = nn.Embedding(vocab_size, vocab_size)
+    def __init__(self): # initialize the model
+        super().__init__() # initialize the base class
+        self.token_embedding_table = nn.Embedding(vocab_size, n_embd) # embedding table
+        self.lm_head = nn.Linear(n_embd, vocab_size) # linear layer to predict the next token
 
-    def forward(self, idx, targets=None):
-        logits = self.token_embedding_table(idx)
+    def forward(self, idx, targets=None): # forward function for the model
+        tok_emb = self.token_embedding_table(idx) # token embeddings
+        logits = self.lm_head(tok_emb) # (B, T, C) - B is the batch size, T is the sequence length, C is the number of characters
 
         if targets is None:
             loss = None
@@ -88,7 +91,7 @@ class BigramLanguageModel(nn.Module):
             idx = torch.cat([idx, idx_next], dim=1)
         return idx
 
-model = BigramLanguageModel(vocab_size)
+model = BigramLanguageModel()
 m = model.to(device)
 
 
@@ -100,7 +103,8 @@ for iter in range(max_iters):
    # every once in a while we need to evaluate the model
     if iter % eval_interval == 0:
         losses = estimate_loss()
-        print(f'step {iter}, train loss: {losses['train']}, val loss: {losses['val']:.4f}')
+        print(f"step {iter}, train loss: {losses['train']:.4f}, val loss: {losses['val']:.4f}")
+
 
     # sample a batch of data
     xb, yb = get_batch('train')
