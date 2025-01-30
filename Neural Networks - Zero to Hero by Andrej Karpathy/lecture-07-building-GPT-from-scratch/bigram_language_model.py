@@ -123,10 +123,12 @@ class Block(nn.Module):
         head_size = n_embd // n_head
         self.sa = MultiHeadAttention(n_head, head_size) # self-attention
         self.ffwd = FeedForward(n_embd) # feedforward layer
+        self.ln1 = nn.LayerNorm(n_embd) # layer normalization
+        self.ln2 = nn.LayerNorm(n_embd) # layer normalization
 
     def forward(self, x):
-        x = x + self.sa(x) # self-attention
-        x = x + self.ffwd(x) # feedforward layer
+        x = x + self.sa(self.ln1(x)) # self-attention
+        x = x + self.ffwd(self.ln2(x)) # feedforward layer
         return x
 
 # Implementing the Transformer model using PyTorch (Bigram Language Model)
@@ -139,7 +141,8 @@ class BigramLanguageModel(nn.Module):
         self.blocks = nn.Sequential(
             Block(n_embd, n_head=4), # two blocks
             Block(n_embd, n_head=4),
-            Block(n_embd, n_head=4)
+            Block(n_embd, n_head=4),
+            nn.LayerNorm(n_embd),
         )
         #self.sa_head = Head(n_embd) # self-attention head
         self.lm_head = nn.Linear(n_embd, vocab_size) # linear layer to predict the next token
