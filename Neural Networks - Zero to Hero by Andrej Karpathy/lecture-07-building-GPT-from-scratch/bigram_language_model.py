@@ -84,13 +84,26 @@ class Head(nn.Module):
         return out 
 
 
+class MultiHeadAttention(nn.Module):
+    """ multiple heads of self-attention in parallel """
+
+    def __init__(self, num_heads, head_size):
+        super().__init__()
+        self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)]) # create a list of heads
+        # self.proj = nn.Linear(head_size * num_heads, n_embd)
+
+    def forward(self, x):
+        return torch.cat([h(x) for h in self.heads], dim=-1) # concatenate the outputs of the heads
+
 # Implementing the Transformer model using PyTorch (Bigram Language Model)
 class BigramLanguageModel(nn.Module):
     def __init__(self): # initialize the model
         super().__init__() # initialize the base class
+
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd) # embedding table
         self.positional_embedding_table = nn.Embedding(block_size, n_embd) # embedding table
-        self.sa_head = Head(n_embd) # self-attention head
+        #self.sa_head = Head(n_embd) # self-attention head
+        self.sa_heads = MultiHeadAttention(4, n_embd // 4) # multiple heads of self-attention in parallel (4 heads)
         self.lm_head = nn.Linear(n_embd, vocab_size) # linear layer to predict the next token
 
     def forward(self, idx, targets=None): # forward function for the model
@@ -100,7 +113,7 @@ class BigramLanguageModel(nn.Module):
         pos_emb = self.positional_embedding_table(torch.arange(T, device=device)) # positional embeddings
 
         x = tok_emb + pos_emb # add token and positional embeddings
-        x = self.sa_head(x) # apply self-attention
+        x = self.sa_heads(x) # apply self-attention
         logits = self.lm_head(x) # (B, T, C) - B is the batch size, T is the sequence length, C is the number of characters.
 
         if targets is None:
