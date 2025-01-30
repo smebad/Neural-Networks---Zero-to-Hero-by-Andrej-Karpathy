@@ -101,7 +101,7 @@ class BigramLanguageModel(nn.Module):
 
         x = tok_emb + pos_emb # add token and positional embeddings
         x = self.sa_head(x) # apply self-attention
-        logits = self.lm_head(x) # (B, T, C) - B is the batch size, T is the sequence length, C is the number of characters
+        logits = self.lm_head(x) # (B, T, C) - B is the batch size, T is the sequence length, C is the number of characters.
 
         if targets is None:
             loss = None
