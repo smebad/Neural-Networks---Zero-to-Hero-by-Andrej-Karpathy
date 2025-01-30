@@ -60,6 +60,7 @@ def estimate_loss():
     model.train()
     return out
 
+# Single head of self-attention
 class Head(nn.Module):
     """ one head of self-attention """
 
@@ -83,31 +84,50 @@ class Head(nn.Module):
         out = wei @ v # (B, T, T) @ (B, T, C) -> (B, T, C)
         return out 
 
-
+# Implementing the multiple heads of self-attention
 class MultiHeadAttention(nn.Module):
     """ multiple heads of self-attention in parallel """
 
     def __init__(self, num_heads, head_size):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)]) # create a list of heads
-        # self.proj = nn.Linear(head_size * num_heads, n_embd)
-
+        self.proj = nn.Linear(n_embd, n_embd) # projection layer
     def forward(self, x):
-        return torch.cat([h(x) for h in self.heads], dim=-1) # concatenate the outputs of the heads
+        out = torch.cat([h(x) for h in self.heads], dim=-1) # concatenate the outputs of the heads
+        out = self.proj(out) # project the concatenated output
+        return out
     
-
+# Implementing the feedforward layer
 class FeedForward(nn.Module): # feedforward layer
     """ a simple linear layer followed by a non-linearity """
 
     def __init__(self, n_embd):
         super().__init__()
         self.net = nn.Sequential( # sequential model
-            nn.Linear(n_embd, n_embd), # linear layer
+            nn.Linear(n_embd, 4 * n_embd), # linear layer
             nn.ReLU(), # ReLU activation function
+            nn.Linear(4 * n_embd, n_embd) # linear layer (projection layer going back to the residual pathway)
         )
 
     def forward(self, x): # forward function
         return self.net(x) # pass the input through the model
+    
+# Implementing the Transformer model
+class Block(nn.Module):
+    """ Transformer block: communication followed by computation """
+
+    def __init__(self, n_embd, n_head):
+        # n_embd: embedding dimension
+        # n_head: number of heads
+        super().__init__()
+        head_size = n_embd // n_head
+        self.sa = MultiHeadAttention(n_head, head_size) # self-attention
+        self.ffwd = FeedForward(n_embd) # feedforward layer
+
+    def forward(self, x):
+        x = x + self.sa(x) # self-attention
+        x = x + self.ffwd(x) # feedforward layer
+        return x
 
 # Implementing the Transformer model using PyTorch (Bigram Language Model)
 class BigramLanguageModel(nn.Module):
@@ -116,9 +136,14 @@ class BigramLanguageModel(nn.Module):
 
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd) # embedding table
         self.positional_embedding_table = nn.Embedding(block_size, n_embd) # embedding table
+        self.blocks = nn.Sequential(
+            Block(n_embd, n_head=4), # two blocks
+            Block(n_embd, n_head=4),
+            Block(n_embd, n_head=4)
+        )
         #self.sa_head = Head(n_embd) # self-attention head
-        self.sa_heads = MultiHeadAttention(4, n_embd // 4) # multiple heads of self-attention in parallel (4 heads)
         self.lm_head = nn.Linear(n_embd, vocab_size) # linear layer to predict the next token
+        # self.sa_heads = MultiHeadAttention(4, n_embd // 4) # multiple heads of self-attention in parallel (4 heads)
 
     def forward(self, idx, targets=None): # forward function for the model
         B, T = idx.shape # B is the batch size, T is the sequence length
@@ -127,9 +152,10 @@ class BigramLanguageModel(nn.Module):
         pos_emb = self.positional_embedding_table(torch.arange(T, device=device)) # positional embeddings
 
         x = tok_emb + pos_emb # add token and positional embeddings
-        x = self.sa_heads(x) # apply self-attention
-        self.ffwd = FeedForward(n_embd) # feedforward layer
-        x = self.ffwd(x) # apply feedforward layer (B, T, C)
+        x = self.blocks(x) # apply two blocks
+        # x = self.sa_heads(x) # apply self-attention
+        # self.ffwd = FeedForward(n_embd) # feedforward layer
+        # x = self.ffwd(x) # apply feedforward layer (B, T, C)
         logits = self.lm_head(x) # (B, T, C) - B is the batch size, T is the sequence length, C is the number of characters.
 
         if targets is None:
