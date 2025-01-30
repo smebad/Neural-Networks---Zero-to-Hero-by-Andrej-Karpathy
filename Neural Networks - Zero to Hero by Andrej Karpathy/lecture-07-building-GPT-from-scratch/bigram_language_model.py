@@ -94,6 +94,20 @@ class MultiHeadAttention(nn.Module):
 
     def forward(self, x):
         return torch.cat([h(x) for h in self.heads], dim=-1) # concatenate the outputs of the heads
+    
+
+class FeedForward(nn.Module): # feedforward layer
+    """ a simple linear layer followed by a non-linearity """
+
+    def __init__(self, n_embd):
+        super().__init__()
+        self.net = nn.Sequential( # sequential model
+            nn.Linear(n_embd, n_embd), # linear layer
+            nn.ReLU(), # ReLU activation function
+        )
+
+    def forward(self, x): # forward function
+        return self.net(x) # pass the input through the model
 
 # Implementing the Transformer model using PyTorch (Bigram Language Model)
 class BigramLanguageModel(nn.Module):
@@ -114,6 +128,8 @@ class BigramLanguageModel(nn.Module):
 
         x = tok_emb + pos_emb # add token and positional embeddings
         x = self.sa_heads(x) # apply self-attention
+        self.ffwd = FeedForward(n_embd) # feedforward layer
+        x = self.ffwd(x) # apply feedforward layer (B, T, C)
         logits = self.lm_head(x) # (B, T, C) - B is the batch size, T is the sequence length, C is the number of characters.
 
         if targets is None:
