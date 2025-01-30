@@ -5,9 +5,9 @@ from torch.nn import functional as F
 # hyperparameters
 batch_size = 32 # number of samples in each batch
 block_size = 8 # length of each input
-max_iters = 3000 # number of training iterations
-eval_interval = 300 # interval to evaluate the model
-learning_rate = 1e-2 # learning rate for the optimizer
+max_iters = 5000 # number of training iterations
+eval_interval = 500 # interval to evaluate the model
+learning_rate = 1e-3 # learning rate for the optimizer
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 eval_iters = 200 # number of iterations to evaluate the model
 n_embd = 32 # dimensionality of the character embeddings
@@ -60,6 +60,29 @@ def estimate_loss():
     model.train()
     return out
 
+class Head(nn.Module):
+    """ one head of self-attention """
+
+    def __init__(self, head_size):
+        super().__init__() # initialize the base class
+        self.key = nn.Linear(n_embd, head_size, bias=False) # key layer
+        self.query = nn.Linear(n_embd, head_size, bias=False) # query layer
+        self.value = nn.Linear(n_embd, head_size, bias=False) # value layer
+        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size))) # lower triangular matrix
+
+    def forward(self, x):
+        B, T, C = x.shape
+        k = self.key(x) # (B, T, C)
+        q = self.query(x) # (B, T, C)
+        # compute attention scores ("affinities")
+        wei = q @ k.transpose(-2, -1) * C**-0.5 # (B, T, C) @ (B, C, T) -> (B, T, T)
+        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # mask out the lower triangular matrix
+        wei = F.softmax(wei, dim=-1) # (B, T, T)
+        # perform the weighted aggregation of the values
+        v = self.value(x) # (B, T, C)
+        out = wei @ v # (B, T, T) @ (B, T, C) -> (B, T, C)
+        return out 
+
 
 # Implementing the Transformer model using PyTorch (Bigram Language Model)
 class BigramLanguageModel(nn.Module):
@@ -67,6 +90,7 @@ class BigramLanguageModel(nn.Module):
         super().__init__() # initialize the base class
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd) # embedding table
         self.positional_embedding_table = nn.Embedding(block_size, n_embd) # embedding table
+        self.sa_head = Head(n_embd) # self-attention head
         self.lm_head = nn.Linear(n_embd, vocab_size) # linear layer to predict the next token
 
     def forward(self, idx, targets=None): # forward function for the model
@@ -76,6 +100,7 @@ class BigramLanguageModel(nn.Module):
         pos_emb = self.positional_embedding_table(torch.arange(T, device=device)) # positional embeddings
 
         x = tok_emb + pos_emb # add token and positional embeddings
+        x = self.sa_head(x) # apply self-attention
         logits = self.lm_head(x) # (B, T, C) - B is the batch size, T is the sequence length, C is the number of characters
 
         if targets is None:
@@ -89,11 +114,12 @@ class BigramLanguageModel(nn.Module):
         return logits, loss
 
     def generate(self, idx, max_new_tokens):
-        for _ in range(max_new_tokens):
-            logits, _ = self(idx)
+        for _ in range(max_new_tokens): # generate max_new_tokens
+            idx_cond = idx[:, -block_size:] # get the last block_size tokens
+            logits, _ = self(idx_cond) # (B, T, C)
             logits = logits[:, -1, :]
             probs = F.softmax(logits, dim=-1)
-            idx_next = torch.multinomial(probs, num_samples=1)
+            idx_next = torch.multinomial(probs, num_samples=1) # sample the next token
             idx = torch.cat([idx, idx_next], dim=1)
         return idx
 
