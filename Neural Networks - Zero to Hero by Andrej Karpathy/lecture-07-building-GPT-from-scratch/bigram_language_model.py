@@ -2,15 +2,18 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-# hyperparameters
+# hyperparameters (as per my CPU configuration)
 batch_size = 32 # number of samples in each batch
-block_size = 8 # length of each input
+block_size = 128 # length of each input
 max_iters = 5000 # number of training iterations
 eval_interval = 500 # interval to evaluate the model
-learning_rate = 1e-3 # learning rate for the optimizer
+learning_rate = 3e-4 # learning rate for the optimizer
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-eval_iters = 200 # number of iterations to evaluate the model
+eval_iters = 100 # number of iterations to evaluate the model
 n_embd = 32 # dimensionality of the character embeddings
+n_head = 4 # number of attention heads
+n_layer = 4 # number of transformer blocks
+dropout = 0.2 # dropout rate
 
 torch.manual_seed(1337)
 
@@ -71,6 +74,8 @@ class Head(nn.Module):
         self.value = nn.Linear(n_embd, head_size, bias=False) # value layer
         self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size))) # lower triangular matrix
 
+        self.dropout = nn.Dropout(dropout) # dropout layer
+
     def forward(self, x):
         B, T, C = x.shape
         k = self.key(x) # (B, T, C)
@@ -79,6 +84,7 @@ class Head(nn.Module):
         wei = q @ k.transpose(-2, -1) * C**-0.5 # (B, T, C) @ (B, C, T) -> (B, T, T)
         wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # mask out the lower triangular matrix
         wei = F.softmax(wei, dim=-1) # (B, T, T)
+        wei = self.dropout(wei)
         # perform the weighted aggregation of the values
         v = self.value(x) # (B, T, C)
         out = wei @ v # (B, T, T) @ (B, T, C) -> (B, T, C)
@@ -92,9 +98,10 @@ class MultiHeadAttention(nn.Module):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)]) # create a list of heads
         self.proj = nn.Linear(n_embd, n_embd) # projection layer
+        self.dropout = nn.Dropout(dropout) # dropout layer
     def forward(self, x):
         out = torch.cat([h(x) for h in self.heads], dim=-1) # concatenate the outputs of the heads
-        out = self.proj(out) # project the concatenated output
+        out = self.dropout(self.proj(out)) # project the concatenated output
         return out
     
 # Implementing the feedforward layer
@@ -106,7 +113,8 @@ class FeedForward(nn.Module): # feedforward layer
         self.net = nn.Sequential( # sequential model
             nn.Linear(n_embd, 4 * n_embd), # linear layer
             nn.ReLU(), # ReLU activation function
-            nn.Linear(4 * n_embd, n_embd) # linear layer (projection layer going back to the residual pathway)
+            nn.Linear(4 * n_embd, n_embd), # linear layer (projection layer going back to the residual pathway)
+            nn.Dropout(dropout),
         )
 
     def forward(self, x): # forward function
@@ -138,12 +146,8 @@ class BigramLanguageModel(nn.Module):
 
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd) # embedding table
         self.positional_embedding_table = nn.Embedding(block_size, n_embd) # embedding table
-        self.blocks = nn.Sequential(
-            Block(n_embd, n_head=4), # two blocks
-            Block(n_embd, n_head=4),
-            Block(n_embd, n_head=4),
-            nn.LayerNorm(n_embd),
-        )
+        self.blocks = nn.Sequential(*[Block(n_embd, n_head=n_head) for _ in range(n_layer)]) # stack of blocks
+        self.ln_f = nn.LayerNorm(n_embd) # final layer normalization
         #self.sa_head = Head(n_embd) # self-attention head
         self.lm_head = nn.Linear(n_embd, vocab_size) # linear layer to predict the next token
         # self.sa_heads = MultiHeadAttention(4, n_embd // 4) # multiple heads of self-attention in parallel (4 heads)
@@ -156,6 +160,7 @@ class BigramLanguageModel(nn.Module):
 
         x = tok_emb + pos_emb # add token and positional embeddings
         x = self.blocks(x) # apply two blocks
+        x = self.ln_f(x) # final layer normalization
         # x = self.sa_heads(x) # apply self-attention
         # self.ffwd = FeedForward(n_embd) # feedforward layer
         # x = self.ffwd(x) # apply feedforward layer (B, T, C)
