@@ -64,6 +64,7 @@ Since training a Transformer on a **CPU (Intel Core i7)** is challenging, I opti
 
 ## **Why GPUs Perform Better - Tested on google colab**
 While this model can run on a CPU, **GPUs** are significantly better because:
+
 ✅ **Parallel Computation**: GPUs handle matrix multiplications much faster.  
 ✅ **Faster Training**: More efficient batch processing and backpropagation.  
 ✅ **Optimized Tensor Operations**: CUDA-based acceleration speeds up operations.  
@@ -90,6 +91,5 @@ While running on a **CPU** required reducing parameters, the core **concepts of 
 ---
 
 ## **References**
-- **Andrej Karpathy's Zero to Hero**: [YouTube Playlist](https://www.youtube.com/playlist?list=PLpDlXwq2U3XlQzyy78LFCeRGXWdpsZt-D)
 - **Original Transformer Paper**: ["Attention is All You Need"](https://arxiv.org/abs/1706.03762)
 - **PyTorch Documentation**: [pytorch.org/docs](https://pytorch.org/docs)
